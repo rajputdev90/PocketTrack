@@ -42,6 +42,7 @@ export const totals = (d: FinanceData, month: string) => {
   const t = txInMonth(d.transactions, month);
   const inc = sum(t.filter((x) => x.type === "income"));
   const spent = sum(expenses(t));
+  const extraSpent = sum(t.filter((x) => x.type === "expense" && x.isUnplanned));
   const budget = d.budgets.find((x) => x.month === month)?.total;
   const eventTotal = (items: FinanceData["events"]) =>
     items.reduce((a, e) => a + Math.round(e.amount * 100), 0) / 100;
@@ -60,6 +61,8 @@ export const totals = (d: FinanceData, month: string) => {
     transactions: t,
     income: inc,
     spent,
+    extraSpent,
+    plannedSpent: Math.round((spent - extraSpent) * 100) / 100,
     budget,
     remaining:
       budget === undefined

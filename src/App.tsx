@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Coins,
   Download,
+  Ghost,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -28,6 +29,7 @@ import { supabase, useFinance } from "./lib/store";
 import { supabaseConfigurationError } from "./lib/supabaseClient";
 import { byCategory, money, monthKey, sourceBalance, totals } from "./lib/finance";
 import { createMonthlyPdf } from "./lib/monthlyReport";
+import { halloweenThemeExpiry, isHalloweenThemeActive } from "./lib/seasonalTheme";
 import { CATEGORIES, type Tx } from "./lib/types";
 const links = [
   ["Dashboard", "/", "LayoutDashboard"],
@@ -62,6 +64,15 @@ function BrandMark() {
 const isPasswordRecoveryUrl = () =>
   window.location.hash.includes("type=recovery") ||
   new URLSearchParams(window.location.search).get("type") === "recovery";
+const HALLOWEEN_THEME_KEY = "pockettrack-halloween-until-v1";
+const getHalloweenExpiry = () => {
+  try {
+    const stored = localStorage.getItem(HALLOWEEN_THEME_KEY);
+    return isHalloweenThemeActive(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+};
 function App() {
   const { data, ready, error, setPref } = useFinance();
   const [month, setMonth] = useState(monthKey(new Date()));
@@ -69,10 +80,37 @@ function App() {
   const [quick, setQuick] = useState(false);
   const [budgetMonth, setBudgetMonth] = useState<string | null>(null);
   const [mobileMore, setMobileMore] = useState(false);
+  const [halloweenUntil, setHalloweenUntil] = useState<string | null>(getHalloweenExpiry);
   const monthPicker = useRef<HTMLInputElement>(null);
+  const halloweenActive = isHalloweenThemeActive(halloweenUntil);
   useEffect(() => {
-    document.documentElement.dataset.theme = data.theme || "light";
-  }, [data.theme]);
+    document.documentElement.dataset.theme = halloweenActive ? "halloween" : data.theme || "light";
+  }, [data.theme, halloweenActive]);
+  useEffect(() => {
+    if (!halloweenUntil || halloweenActive) return;
+    try { localStorage.removeItem(HALLOWEEN_THEME_KEY); } catch { /* storage may be unavailable */ }
+    setHalloweenUntil(null);
+  }, [halloweenUntil, halloweenActive]);
+  useEffect(() => {
+    if (!halloweenActive || !halloweenUntil) return;
+    const timer = window.setInterval(() => {
+      if (!isHalloweenThemeActive(halloweenUntil)) {
+        try { localStorage.removeItem(HALLOWEEN_THEME_KEY); } catch { /* storage may be unavailable */ }
+        setHalloweenUntil(null);
+      }
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [halloweenActive, halloweenUntil]);
+  const toggleHalloween = () => {
+    if (halloweenActive) {
+      try { localStorage.removeItem(HALLOWEEN_THEME_KEY); } catch { /* storage may be unavailable */ }
+      setHalloweenUntil(null);
+      return;
+    }
+    const expiry = halloweenThemeExpiry();
+    try { localStorage.setItem(HALLOWEEN_THEME_KEY, expiry); } catch { /* theme still works until reload */ }
+    setHalloweenUntil(expiry);
+  };
   const loggedOut = !!supabase && error.includes("Sign in");
   if (supabase && isPasswordRecoveryUrl()) return <AuthScreen />;
   if (!ready)
@@ -152,6 +190,7 @@ function App() {
               <Menu size={19} />
             </button>
           )}
+          {halloweenActive && <span className="halloween-active-label"><Ghost size={14} /> Spooky season</span>}
           <div className="mobile-brand">
             <BrandMark />
             <b>Pocket<span>Track</span></b>
@@ -197,12 +236,15 @@ function App() {
             </div>
             <button
               className="icon-button theme-toggle"
-              title="Toggle theme"
+              aria-label={halloweenActive ? "Turn off Halloween theme" : "Toggle light and dark mode"}
+              title={halloweenActive ? "Turn off Halloween theme" : "Toggle theme"}
               onClick={() =>
-                setPref("theme", data.theme === "dark" ? "light" : "dark")
+                halloweenActive
+                  ? toggleHalloween()
+                  : setPref("theme", data.theme === "dark" ? "light" : "dark")
               }
             >
-              {data.theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+              {halloweenActive ? <Ghost size={17} /> : data.theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
             </button>
             <button
               aria-label="Add transaction"
@@ -235,7 +277,7 @@ function App() {
             <Route path="/goals" element={<Goals />} />
             <Route path="/budgets" element={<Budgets month={month} />} />
             <Route path="/coach" element={<Coach month={month} />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/settings" element={<SettingsPage halloweenActive={halloweenActive} halloweenUntil={halloweenUntil} onToggleHalloween={toggleHalloween} />} />
             <Route
               path="*"
               element={<Dashboard month={month} onMonth={setMonth} onBudget={() => setBudgetMonth(month)} />}
@@ -663,6 +705,7 @@ function TransactionModal({
     amount: edit?.amount.toString() || "",
     date: edit?.date || format(new Date(), "yyyy-MM-dd"),
     type: edit?.type || "expense",
+    isUnplanned: edit?.isUnplanned ?? false,
     category: edit?.category || "Food",
     paymentMethod: edit?.paymentMethod || "",
     notes: edit?.notes || "",
@@ -688,7 +731,7 @@ function TransactionModal({
       setForm((previous) => {
         const options = namesFor(nextType);
         const category = options.find((name) => name.toLocaleLowerCase() === previous.category.toLocaleLowerCase()) || options[0] || "";
-        return { ...previous, type: nextType, category };
+        return { ...previous, type: nextType, category, isUnplanned: nextType === "expense" ? previous.isUnplanned : false };
       });
       setCategoryMessage("");
       return;
@@ -747,6 +790,7 @@ function TransactionModal({
                 amount,
                 category: category?.name || categoryName,
                 type,
+                isUnplanned: type === "expense" && form.isUnplanned,
                 paymentMethod: form.paymentMethod,
                 notes: form.notes,
                 createdAt: edit?.createdAt || now,
@@ -849,6 +893,19 @@ function TransactionModal({
               {categoryMessage && <span className="category-saved-note" role="status">{categoryMessage}</span>}
             </label>
           </div>
+          {form.type === "expense" && (
+            <div className="unplanned-field">
+              <label className="unplanned-toggle">
+                <input
+                  type="checkbox"
+                  checked={form.isUnplanned}
+                  onChange={(e) => setForm((previous) => ({ ...previous, isUnplanned: e.target.checked }))}
+                />
+                <span>Mark as extra / unplanned</span>
+              </label>
+              <small>Still included in total spending and budget usage.</small>
+            </div>
+          )}
           <label>
             Payment method <span className="optional">Optional</span>
             <input
@@ -895,6 +952,7 @@ function Transactions({
   const [query, setQuery] = useState("");
   const [type, setType] = useState("all");
   const [category, setCategory] = useState("all");
+  const [expensePlan, setExpensePlan] = useState("all");
   const [sort, setSort] = useState<"date" | "amount">("date");
   const [edit, setEdit] = useState<Tx | undefined>();
   const [add, setAdd] = useState(false);
@@ -915,7 +973,8 @@ function Transactions({
             .toLowerCase()
             .includes(query.toLowerCase())) &&
         (type === "all" || x.type === type) &&
-        (category === "all" || x.category === category),
+        (category === "all" || x.category === category) &&
+        (expensePlan === "all" || (x.type === "expense" && (expensePlan === "extra" ? x.isUnplanned : !x.isUnplanned))),
     )
     .sort((a, b) =>
       sort === "date" ? b.date.localeCompare(a.date) : b.amount - a.amount,
@@ -949,12 +1008,19 @@ function Transactions({
           <span className="top-add-label">Add transaction</span>
         </button>
       </PageHead>
-      <div className="stat-grid compact-stats">
+      <div className="stat-grid compact-stats extra-expense-stats">
         <Stat
           label="Expenses"
           value={money(t.spent, data.currency)}
           icon={<ArrowUpRight size={17} />}
           sub="Qualifying spending"
+        />
+        <Stat
+          label="Extra / unplanned"
+          value={money(t.extraSpent, data.currency)}
+          icon={<ArrowUpRight size={17} />}
+          sub="Included in total spending"
+          accent
         />
         <Stat
           label="Budget left"
@@ -1008,6 +1074,15 @@ function Transactions({
             ))}
           </select>
           <select
+            aria-label="Expense plan status"
+            value={expensePlan}
+            onChange={(e) => setExpensePlan(e.target.value)}
+          >
+            <option value="all">All expense plans</option>
+            <option value="planned">Planned expenses</option>
+            <option value="extra">Extra / unplanned</option>
+          </select>
+          <select
             aria-label="Sort"
             value={sort}
             onChange={(e) => setSort(e.target.value as "date" | "amount")}
@@ -1055,6 +1130,7 @@ function Transactions({
                       </td>
                       <td>
                         <span className={`type-pill ${x.type}`}>{x.type === "income" ? "Money received" : x.type}</span>
+                        {x.type === "expense" && x.isUnplanned && <span className="unplanned-badge">Extra</span>}
                       </td>
                       <td
                         className={`amount ${x.type === "income" ? "positive" : ""}`}
@@ -1108,7 +1184,7 @@ function Transactions({
         ) : (
           <Empty
             title={
-              query || type !== "all" || category !== "all"
+              query || type !== "all" || category !== "all" || expensePlan !== "all"
                 ? "No matching transactions"
                 : "No transactions this month"
             }
@@ -1151,6 +1227,12 @@ function Transactions({
               <b>{selected.type === "income" ? "Money received" : selected.type}</b>
               <span>Category</span>
               <b>{selected.category}</b>
+              {selected.type === "expense" && (
+                <>
+                  <span>Budget status</span>
+                  <b>{selected.isUnplanned ? "Extra / unplanned" : "Planned expense"}</b>
+                </>
+              )}
               <span>Payment</span>
               <b>{selected.paymentMethod || "—"}</b>
               <span>Notes</span>
@@ -1177,12 +1259,19 @@ function Spending({ month }: { month: string }) {
         title="Spending"
         sub="See the habits behind the numbers."
       />
-      <div className="stat-grid compact-stats">
+      <div className="stat-grid compact-stats extra-expense-stats">
         <Stat
           label="Spent this month"
           value={money(t.spent, data.currency)}
           icon={<ArrowUpRight size={17} />}
           sub="Qualifying expenses"
+        />
+        <Stat
+          label="Extra / unplanned"
+          value={money(t.extraSpent, data.currency)}
+          icon={<ArrowUpRight size={17} />}
+          sub="Part of total spending"
+          accent
         />
         <Stat
           label="Transactions"
@@ -2111,7 +2200,15 @@ function Coach({ month }: { month: string }) {
     </>
   );
 }
-function SettingsPage() {
+function SettingsPage({
+  halloweenActive,
+  halloweenUntil,
+  onToggleHalloween,
+}: {
+  halloweenActive: boolean;
+  halloweenUntil: string | null;
+  onToggleHalloween: () => void;
+}) {
   const { data, setPref } = useFinance();
   return (
     <>
@@ -2148,6 +2245,21 @@ function SettingsPage() {
                   <Moon size={16} /> Dark mode
                 </>
               )}
+            </button>
+          </div>
+          <div className="setting-row halloween-setting-row">
+            <div>
+              <b><Ghost size={15} /> Halloween theme</b>
+              <span>{halloweenActive && halloweenUntil
+                ? `A little spooky, then it turns off on ${format(new Date(halloweenUntil), "d MMM yyyy")}.`
+                : "A limited-time, creepy-but-calm look for 15 days. Saved on this device."}</span>
+            </div>
+            <button
+              className={`button ${halloweenActive ? "button-primary" : "button-outline"}`}
+              aria-pressed={halloweenActive}
+              onClick={onToggleHalloween}
+            >
+              <Ghost size={16} /> {halloweenActive ? "Turn off theme" : "Try for 15 days"}
             </button>
           </div>
         </Card>

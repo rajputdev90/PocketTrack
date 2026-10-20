@@ -68,6 +68,17 @@ export async function createMonthlyPdf(
 
   let y = nextSection();
   doc.setFontSize(12);
+  doc.text("Expense plan breakdown", 42, y);
+  table({
+    startY: y + 8,
+    head: [["Planned expenses", "Extra / unplanned", "Total qualifying spending"]],
+    body: [[pdfMoney(t.plannedSpent), pdfMoney(t.extraSpent), pdfMoney(t.spent)]],
+    theme: "grid",
+    styles: { fontSize: 8, cellPadding: 6 },
+  });
+
+  y = nextSection();
+  doc.setFontSize(12);
   doc.text("Savings activity & tracked sources", 42, y);
   table({
     startY: y + 9,
@@ -134,7 +145,7 @@ export async function createMonthlyPdf(
   doc.text("Transactions", 42, y);
   const txRows = [...t.transactions]
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map((x) => [x.date, x.description || "(No description)", x.category || "—", x.type, `${x.type === "expense" ? "−" : x.type === "income" ? "+" : ""}${pdfMoney(x.amount)}`]);
+    .map((x) => [x.date, x.description || "(No description)", x.category || "—", x.type === "expense" && x.isUnplanned ? "Expense · extra" : x.type, `${x.type === "expense" ? "−" : x.type === "income" ? "+" : ""}${pdfMoney(x.amount)}`]);
   table({
     startY: y + 8,
     head: [["Date", "Description", "Category", "Type", "Amount"]],

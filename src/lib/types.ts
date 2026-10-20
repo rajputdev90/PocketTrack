@@ -7,6 +7,8 @@ export type Tx = {
   amount: number;
   type: TxType;
   category: string;
+  /** Marks an expense as outside the user's original plan; still counts toward spending/budgets. */
+  isUnplanned?: boolean;
   paymentMethod?: string;
   notes?: string;
   sourceId?: string;

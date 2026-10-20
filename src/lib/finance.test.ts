@@ -4,6 +4,7 @@ import { EMPTY_DATA, type FinanceData, type Tx } from "./types";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { createMonthlyPdf } from "./monthlyReport";
+import { HALLOWEEN_THEME_DAYS, halloweenThemeExpiry, isHalloweenThemeActive } from "./seasonalTheme";
 const tx = (
   id: string,
   date: string,
@@ -66,6 +67,24 @@ describe("monthly finance calculations", () => {
         tx("b", "2026-10-02", 0.2, "expense"),
       ]),
     ).toEqual([{ name: "Food", value: 0.3 }]);
+  });
+  it("tracks unplanned expenses separately while including them in budget totals", () => {
+    const data: FinanceData = {
+      ...EMPTY_DATA,
+      transactions: [
+        { ...tx("planned", "2026-10-02", 75, "expense"), isUnplanned: false },
+        { ...tx("unexpected", "2026-10-03", 25, "expense"), isUnplanned: true },
+        { ...tx("transfer", "2026-10-04", 500, "transfer"), isUnplanned: true },
+      ],
+      budgets: [{ id: "b", month: "2026-10", total: 90, categories: {} }],
+    };
+    expect(totals(data, "2026-10")).toMatchObject({
+      spent: 100,
+      plannedSpent: 75,
+      extraSpent: 25,
+      remaining: -10,
+      net: -100,
+    });
   });
   it("keeps savings contributions distinct from expenses", () => {
     const data: FinanceData = {
@@ -143,6 +162,20 @@ describe("monthly finance calculations", () => {
     expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(1);
     expect(doc.output("arraybuffer").byteLength).toBeGreaterThan(1000);
   });
+  it("reports planned and extra expenses separately without changing total spending", async () => {
+    const reportData: FinanceData = {
+      ...EMPTY_DATA,
+      transactions: [
+        tx("planned lunch", "2026-10-02", 80, "expense"),
+        { ...tx("unexpected repair", "2026-10-03", 120, "expense"), isUnplanned: true },
+      ],
+    };
+    const { doc } = await createMonthlyPdf(reportData, "2026-10");
+    const content = doc.output();
+    expect(content).toContain("Expense plan breakdown");
+    expect(content).toContain("Extra / unplanned");
+    expect(content).toContain("Expense · extra");
+  });
   it("includes selected-month data and paginates all report transactions", async () => {
     const many: FinanceData = {
       ...EMPTY_DATA,
@@ -152,5 +185,16 @@ describe("monthly finance calculations", () => {
     };
     const { doc } = await createMonthlyPdf(many, "2026-10");
     expect(doc.getNumberOfPages()).toBeGreaterThan(1);
+  });
+});
+
+describe("seasonal Halloween theme", () => {
+  it("expires 15 days after it is enabled", () => {
+    const started = new Date("2026-10-20T12:00:00.000Z");
+    const expiresAt = halloweenThemeExpiry(started);
+    expect(HALLOWEEN_THEME_DAYS).toBe(15);
+    expect(expiresAt).toBe("2026-11-04T12:00:00.000Z");
+    expect(isHalloweenThemeActive(expiresAt, started.getTime())).toBe(true);
+    expect(isHalloweenThemeActive(expiresAt, Date.parse(expiresAt))).toBe(false);
   });
 });
