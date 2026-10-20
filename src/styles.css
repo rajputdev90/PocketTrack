@@ -273,6 +273,14 @@ html[data-theme="dark"] .brand-mark-dark {
   padding: 0 42px;
   z-index: 4;
 }
+.sidebar-expand { display: none; }
+.is-collapsed .sidebar-expand {
+  display: inline-grid;
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+}
 .topbar-right {
   display: flex;
   align-items: center;
@@ -1694,6 +1702,7 @@ html[data-theme="dark"] .auth-button { border-color: #2b3838; }
   }
 }
 @media (max-width: 760px) {
+  .sidebar-expand { display: none !important; }
   .sidebar {
     display: none;
   }

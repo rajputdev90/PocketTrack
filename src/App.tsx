@@ -86,7 +86,7 @@ function App() {
   const selected = new Date(`${month}-01T12:00:00`);
   return (
     <div className={`app-shell ${collapsed ? "is-collapsed" : ""}`}>
-      <aside className="sidebar">
+      <aside id="app-sidebar" className="sidebar">
         <div className="brand">
           <BrandMark />
           {!collapsed && (
@@ -98,6 +98,8 @@ function App() {
           <button
             className="icon-button collapse"
             aria-label="Collapse navigation"
+            aria-expanded={!collapsed}
+            aria-controls="app-sidebar"
             onClick={() => setCollapsed(!collapsed)}
           >
             <Menu size={17} />
@@ -138,6 +140,18 @@ function App() {
       </aside>
       <main className="main-area">
         <header className="topbar">
+          {collapsed && (
+            <button
+              className="icon-button sidebar-expand"
+              aria-label="Show sidebar"
+              aria-expanded="false"
+              aria-controls="app-sidebar"
+              title="Show sidebar"
+              onClick={() => setCollapsed(false)}
+            >
+              <Menu size={19} />
+            </button>
+          )}
           <div className="mobile-brand">
             <BrandMark />
             <b>Pocket<span>Track</span></b>
