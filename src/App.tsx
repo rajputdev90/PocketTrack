@@ -2218,7 +2218,7 @@ function AuthScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [oauthBusy, setOauthBusy] = useState<string | null>(null);
+  const [oauthBusy, setOauthBusy] = useState<"google" | null>(null);
   const isSignIn = mode === "in";
   const isSignUp = mode === "up";
   const isRecovery = mode === "forgot";
@@ -2268,23 +2268,11 @@ function AuthScreen() {
           </div>
           {(isSignIn || isSignUp) && (
             <>
-              <div className="oauth-options" aria-label="Continue with a social account">
+              <div className="oauth-options" aria-label="Continue with Google">
                 <OAuthButton provider="google" label="Google" busy={oauthBusy} onClick={async () => {
                   if (!supabase) return;
                   setOauthBusy("google"); setMessage("");
                   const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
-                  if (error) { setMessage(error.message); setOauthBusy(null); }
-                }} />
-                <OAuthButton provider="apple" label="Apple" busy={oauthBusy} onClick={async () => {
-                  if (!supabase) return;
-                  setOauthBusy("apple"); setMessage("");
-                  const { error } = await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: window.location.origin } });
-                  if (error) { setMessage(error.message); setOauthBusy(null); }
-                }} />
-                <OAuthButton provider="facebook" label="Facebook" busy={oauthBusy} onClick={async () => {
-                  if (!supabase) return;
-                  setOauthBusy("facebook"); setMessage("");
-                  const { error } = await supabase.auth.signInWithOAuth({ provider: "facebook", options: { redirectTo: window.location.origin } });
                   if (error) { setMessage(error.message); setOauthBusy(null); }
                 }} />
               </div>
@@ -2422,10 +2410,10 @@ function AuthScreen() {
   );
 }
 
-function OAuthButton({ provider, label, busy, onClick }: { provider: "google" | "apple" | "facebook"; label: string; busy: string | null; onClick: () => void }) {
+function OAuthButton({ provider, label, busy, onClick }: { provider: "google"; label: string; busy: "google" | null; onClick: () => void }) {
   return <button type="button" className={`oauth-button oauth-${provider}`} onClick={onClick} disabled={!!busy} aria-label={`Continue with ${label}`}>
     <span className="oauth-icon" aria-hidden="true">
-      {provider === "google" ? <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M21.35 12.23c0-.72-.06-1.42-.18-2.1H12v3.97h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.15c1.84-1.7 2.9-4.2 2.9-7.26Z"/><path fill="#34A853" d="M12 21.6c2.62 0 4.82-.87 6.43-2.36l-3.14-2.45c-.87.58-1.98.93-3.29.93-2.53 0-4.67-1.7-5.44-4H3.31v2.53A9.71 9.71 0 0 0 12 21.6Z"/><path fill="#FBBC05" d="M6.56 13.72a5.84 5.84 0 0 1 0-3.44V7.75H3.31a9.66 9.66 0 0 0 0 8.5l3.25-2.53Z"/><path fill="#EA4335" d="M12 6.28c1.43 0 2.71.5 3.72 1.48l2.8-2.8A9.36 9.36 0 0 0 12 2.4a9.71 9.71 0 0 0-8.69 5.35l3.25 2.53c.77-2.3 2.91-4 5.44-4Z"/></svg> : provider === "apple" ? <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.37 12.62c.02 2.13 1.87 2.84 1.89 2.85-.02.05-.3 1.03-.97 2.04-.58.87-1.18 1.74-2.13 1.76-.93.02-1.23-.57-2.3-.57s-1.4.55-2.27.59c-.91.03-1.6-.95-2.19-1.82-1.2-1.75-2.12-4.95-.89-7.11a3.37 3.37 0 0 1 2.84-1.73c.89-.02 1.73.62 2.28.62.54 0 1.55-.77 2.61-.66.45.02 1.72.18 2.54 1.37-.07.04-1.52.89-1.51 2.66ZM14.65 6.5c.48-.58.8-1.38.71-2.18-.69.03-1.52.46-2.01 1.03-.44.5-.83 1.32-.73 2.1.77.06 1.55-.39 2.03-.95Z"/></svg> : <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 21v-8.2h2.76l.41-3.2H13.5V7.56c0-.93.26-1.56 1.6-1.56h1.7V3.14c-.3-.04-1.34-.14-2.55-.14-2.52 0-4.25 1.54-4.25 4.37V9.6H7.15v3.2H10V21h3.5Z"/></svg>}
+      <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M21.35 12.23c0-.72-.06-1.42-.18-2.1H12v3.97h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.15c1.84-1.7 2.9-4.2 2.9-7.26Z"/><path fill="#34A853" d="M12 21.6c2.62 0 4.82-.87 6.43-2.36l-3.14-2.45c-.87.58-1.98.93-3.29.93-2.53 0-4.67-1.7-5.44-4H3.31v2.53A9.71 9.71 0 0 0 12 21.6Z"/><path fill="#FBBC05" d="M6.56 13.72a5.84 5.84 0 0 1 0-3.44V7.75H3.31a9.66 9.66 0 0 0 0 8.5l3.25-2.53Z"/><path fill="#EA4335" d="M12 6.28c1.43 0 2.71.5 3.72 1.48l2.8-2.8A9.36 9.36 0 0 0 12 2.4a9.71 9.71 0 0 0-8.69 5.35l3.25 2.53c.77-2.3 2.91-4 5.44-4Z"/></svg>
     </span><span>{busy === provider ? "Connecting…" : label}</span>
   </button>;
 }
